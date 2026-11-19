@@ -10,6 +10,8 @@
   "dependencies": {
     "@electric-sql/pglite": "^0.3.16",
     "@neondatabase/serverless": "^1.2.1",
+    "@zxing/browser": "^0.1.5",
+    "@zxing/library": "^0.21.3",
     "next": "16.4.6",
     "react": "19.1.1",
     "react-dom": "19.1.1"
