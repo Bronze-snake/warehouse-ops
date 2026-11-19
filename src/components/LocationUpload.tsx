@@ -31,9 +31,16 @@ export default function LocationUpload() {
       const pairs: [string, string][] = [];
       for (const r of rows.slice(1)) { const s = (r[si] || "").trim(), b = (r[li] || "").trim(); if (s && b) pairs.push([s, b]); }
       if (!pairs.length) throw new Error("No SKU/location pairs in the file");
-      const post = (body: unknown) => fetch("/api/locations/upload", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }).then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(j.error || "Upload failed"); return j; });
+      const post = async (body: unknown) => {
+        const r = await fetch("/api/locations/upload", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+        const text = await r.text();
+        let j: { error?: string } = {};
+        try { j = JSON.parse(text); } catch { throw new Error(`Server replied ${r.status} ${r.statusText}: ${text.replace(/<[^>]+>/g, " ").trim().slice(0, 200) || "(empty)"}`); }
+        if (!r.ok) throw new Error(j.error || `Upload failed (${r.status})`);
+        return j;
+      };
       await post({ mode: "start" });
-      for (let i = 0; i < pairs.length; i += 2000) { await post({ mode: "append", rows: pairs.slice(i, i + 2000) }); setMsg({ t: `Uploading… ${Math.min(i + 2000, pairs.length).toLocaleString()} / ${pairs.length.toLocaleString()}`, ok: true }); }
+      for (let i = 0; i < pairs.length; i += 1000) { await post({ mode: "append", rows: pairs.slice(i, i + 1000) }); setMsg({ t: `Uploading… ${Math.min(i + 1000, pairs.length).toLocaleString()} / ${pairs.length.toLocaleString()}`, ok: true }); }
       await post({ mode: "finish", file: file.name, total: pairs.length });
       setMsg({ t: `Loaded ${pairs.length.toLocaleString()} SKU locations from ${file.name}.`, ok: true });
       setTimeout(() => window.location.reload(), 1200);
