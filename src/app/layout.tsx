@@ -8,7 +8,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="en"><body>
       <header className="top">
         <a className="brand" href="/">BRONZE SNAKE · WAREHOUSE</a>
-        {user && <div className="who"><span>{user}</span><form method="post" action="/api/logout"><button className="secondary" style={{ padding: "4px 10px", fontSize: 13 }}>Sign out</button></form></div>}
+        {user && <div className="who">{user !== "Warehouse" && <span>{user}</span>}<form method="post" action="/api/logout"><button className="secondary" style={{ padding: "4px 10px", fontSize: 13 }}>Sign out</button></form></div>}
       </header>
       <main>{children}</main>
     </body></html>
