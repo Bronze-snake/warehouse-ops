@@ -75,6 +75,7 @@ CREATE TABLE IF NOT EXISTS putaway_lines (
 );
 CREATE INDEX IF NOT EXISTS putaway_lines_batch ON putaway_lines(batch_id);
 CREATE INDEX IF NOT EXISTS putaway_batches_fp ON putaway_batches(fingerprint, created_at);
+ALTER TABLE bins ADD COLUMN IF NOT EXISTS name text NOT NULL DEFAULT '';
 `;
 
 export async function q<T = Row>(sql: string, params: unknown[] = []): Promise<T[]> {

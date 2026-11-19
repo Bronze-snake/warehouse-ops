@@ -27,10 +27,11 @@ export default function LocationUpload() {
       const rows = parseCsv(await file.text());
       const hdr = rows[0].map((h) => h.trim().toLowerCase());
       const si = hdr.indexOf("sku"), li = hdr.findIndex((h) => h === "warehouselocation" || h.includes("location"));
+      const ni = hdr.findIndex((h) => h === "name" || h === "product name" || h === "item name" || h === "description" || h.includes("name"));
       if (si < 0 || li < 0) throw new Error("Need SKU and WarehouseLocation columns. Found: " + rows[0].join(", "));
-      const seen = new Map<string, string>();
-      for (const r of rows.slice(1)) { const s = (r[si] || "").trim(), b = (r[li] || "").trim(); if (s && b) seen.set(s, b); } // last line for a SKU wins
-      const pairs: [string, string][] = [...seen.entries()];
+      const seen = new Map<string, [string, string]>();
+      for (const r of rows.slice(1)) { const s = (r[si] || "").trim(), b = (r[li] || "").trim(); if (s && b) seen.set(s, [b, ni >= 0 ? (r[ni] || "").trim() : ""]); } // last line for a SKU wins
+      const pairs = [...seen.entries()].map(([s, [b, n]]) => [s, b, n]);
       if (!pairs.length) throw new Error("No SKU/location pairs in the file");
       const post = async (body: unknown) => {
         const r = await fetch("/api/locations/upload", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
