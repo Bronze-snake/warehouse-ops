@@ -45,3 +45,15 @@ table.list td.tick { width:34px; } table.list td.tick span { display:inline-bloc
   h1 { font-size:18px; }
 }
 @media (max-width:600px) { table.list { font-size:14px; } table.list th:nth-child(5), table.list td:nth-child(5) { display:none; } }
+
+/* phone pick list */
+ul.plist { list-style:none; margin:0; padding:0; border-top:1px solid var(--line); }
+ul.plist li { display:grid; grid-template-columns:76px 1fr 44px 28px; align-items:center; gap:10px; padding:12px 4px; border-bottom:1px solid var(--line); cursor:pointer; -webkit-tap-highlight-color:transparent; }
+ul.plist .pbin { font-weight:800; font-size:20px; letter-spacing:.02em; }
+ul.plist .pname { font-size:16px; font-weight:600; line-height:1.25; }
+ul.plist .psize { font-size:14px; color:var(--muted); margin-top:2px; }
+ul.plist .pqty { font-size:22px; font-weight:800; text-align:center; }
+ul.plist .ptick { width:26px; height:26px; border:2px solid #333; border-radius:6px; text-align:center; line-height:22px; font-weight:800; }
+ul.plist li.done { opacity:.4; } ul.plist li.done .pname { text-decoration:line-through; } ul.plist li.done .ptick { background:#111; color:#fff; border-color:#111; }
+ul.plist li.noloc { background:var(--red); }
+@media print { ul.plist li { break-inside:avoid; padding:5px 2px; } ul.plist .pbin { font-size:14px; } ul.plist .pqty { font-size:14px; } ul.plist li.done { display:none; } details { display:none; } }
