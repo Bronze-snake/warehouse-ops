@@ -1,5 +1,6 @@
 "use client";
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
+import CameraScan from "./CameraScan";
 
 export default function ScanForm() {
   const [text, setText] = useState("");
@@ -7,6 +8,8 @@ export default function ScanForm() {
   const [err, setErr] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const [code, setCode] = useState("");
+  const [cam, setCam] = useState(false);
+  const onScanned = useCallback((c: string) => { setCam(false); setText((t) => (t ? t + "\n" : "") + c.trim() + ",1"); setTimeout(() => setCam(true), 400); }, []);
 
   // Keyboard-wedge scanner: each scan types the barcode + Enter into the field; we append "barcode,1".
   function onScanKey(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -26,9 +29,11 @@ export default function ScanForm() {
 
   return (
     <form className="card" onSubmit={submit}>
+      {cam && <CameraScan onScan={onScanned} onClose={() => setCam(false)} />}
       <label>Scan file (CSV: Barcode, Quantity)</label>
       <input type="file" name="file" accept=".csv,.txt,text/csv" />
       <label>…or scan here (gun or keyboard – each scan adds 1)</label>
+      <div className="row" style={{ margin: "4px 0 8px" }}><button type="button" className="secondary" onClick={() => setCam(true)}>📷 Scan with camera</button></div>
       <input ref={input} type="text" value={code} onChange={(e) => setCode(e.target.value)} onKeyDown={onScanKey} placeholder="Scan a barcode" inputMode="numeric" autoComplete="off" />
       <label>Scanned so far {lines ? `(${lines} lines)` : ""} – you can edit quantities here</label>
       <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder={"254221,2\n259413,1"} />

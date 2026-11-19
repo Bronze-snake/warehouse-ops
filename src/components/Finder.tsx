@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import CameraScan from "./CameraScan";
 type Hit = { sku: string; bin: string; name: string; size?: string; colour?: string; via: string };
 
 export default function Finder() {
@@ -7,6 +8,7 @@ export default function Finder() {
   const [hits, setHits] = useState<Hit[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [cam, setCam] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => { input.current?.focus(); }, []);
@@ -29,12 +31,15 @@ export default function Finder() {
   function onKey(e: React.KeyboardEvent<HTMLInputElement>) { if (e.key === "Enter") { e.preventDefault(); if (timer.current) clearTimeout(timer.current); search(term); } }
   function clear() { setTerm(""); setHits(null); setErr(null); input.current?.focus(); }
 
+  const onScanned = useCallback((code: string) => { setCam(false); setTerm(code); search(code); }, []);
   const first = hits?.[0];
   return (
     <>
+      {cam && <CameraScan onScan={onScanned} onClose={() => setCam(false)} />}
       <div className="card">
         <input ref={input} type="text" value={term} onChange={(e) => onChange(e.target.value)} onKeyDown={onKey} placeholder="Scan or type…" autoComplete="off" style={{ fontSize: 22, padding: 14 }} />
-        <div className="row" style={{ marginTop: 10 }}><button type="button" onClick={() => search(term)} disabled={busy}>{busy ? "Looking…" : "Find"}</button><button type="button" className="secondary" onClick={clear}>Clear</button></div>
+        <div className="row" style={{ marginTop: 10 }}><button type="button" onClick={() => setCam(true)}>📷 Scan with camera</button><button type="button" className="secondary" onClick={() => search(term)} disabled={busy}>{busy ? "Looking…" : "Find"}</button><button type="button" className="secondary" onClick={clear}>Clear</button></div>
+        <p className="meta" style={{ margin: "8px 0 0" }}>A barcode gun also works – just scan with the box selected.</p>
         {err && <div className="err">{err}</div>}
       </div>
       {hits && hits.length === 0 && <div className="warn">Nothing found for “{term}”. Check the spelling, or it may have no bin in ShipStation yet.</div>}
