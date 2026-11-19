@@ -11,7 +11,9 @@ export async function POST(req: Request) {
   const body = (await req.json()) as { mode: string; rows?: [string, string][]; file?: string; total?: number };
   if (body.mode === "start") { await q("DELETE FROM bins"); return NextResponse.json({ ok: true }); }
   if (body.mode === "append") {
-    const rows = (body.rows || []).filter((r) => r[0] && r[1]);
+    const m = new Map<string, string>();
+    for (const r of body.rows || []) if (r[0] && r[1]) m.set(String(r[0]).trim(), String(r[1]).trim());
+    const rows: [string, string][] = [...m.entries()];
     for (let i = 0; i < rows.length; i += 250) {
       const chunk = rows.slice(i, i + 250);
       const values = chunk.map((_, j) => `($${j * 2 + 1},$${j * 2 + 2},now())`).join(",");
