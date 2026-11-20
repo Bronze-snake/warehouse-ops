@@ -58,3 +58,16 @@ ul.plist li.done { opacity:.4; } ul.plist li.done .pname { text-decoration:line-
 ul.plist li.noloc { background:var(--red); }
 @media print { ul.plist li { break-inside:avoid; padding:5px 2px; } ul.plist .pbin { font-size:14px; } ul.plist .pqty { font-size:14px; } ul.plist li.done { display:none; } details { display:none; } }
 ul.plist li.unknown { background:var(--grey); }
+
+/* pick list */
+.segs { display:flex; border:1px solid var(--line); border-radius:10px; overflow:hidden; margin-top:6px; }
+.segs button { flex:1; background:#fff; color:var(--ink); border:none; border-radius:0; padding:10px 6px; font-weight:600; font-size:15px; }
+.segs button + button { border-left:1px solid var(--line); }
+.segs button.on { background:var(--accent); color:#fff; } .segs button small { font-weight:400; opacity:.75; }
+ul.plist.pick li { grid-template-columns:72px 1fr 54px 28px; }
+ul.plist.pick .pqty small { font-size:13px; font-weight:600; color:var(--muted); } ul.plist.pick .pqty .got { color:#1b7f3b; }
+ul.plist.pick li.open { background:var(--soft); }
+.pactions { margin-top:8px; }
+.deptpill { display:inline-block; margin-left:8px; padding:0 6px; border-radius:999px; background:var(--soft); font-size:11px; font-weight:600; color:#555; vertical-align:middle; }
+.deptpill.manual { background:#fff2cc; }
+@media print { .segs { display:none; } ul.plist.pick li { grid-template-columns:60px 1fr 40px 24px; } ul.plist.pick .pactions { display:none; } }

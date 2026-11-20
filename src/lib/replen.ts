@@ -4,16 +4,16 @@ import { gql, ONLINE_WAREHOUSE_ID } from "./shopify";
 export type ReplenLine = { sku: string; product: string; size: string; colour: string; dept: string; units: number; orders: number; bin: string; variant_id: string };
 export type Window = { start: Date; end: Date; label: string };
 
-const TZ = "Australia/Melbourne";
+export const TZ = "Australia/Melbourne";
 // Melbourne wall-clock -> Date. Works out the zone offset for that day (handles AEST/AEDT).
-function melb(y: number, m: number, d: number, h: number, min = 0): Date {
+export function melb(y: number, m: number, d: number, h: number, min = 0): Date {
   const guess = new Date(Date.UTC(y, m - 1, d, h, min));
   const parts = new Intl.DateTimeFormat("en-AU", { timeZone: TZ, hour12: false, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).formatToParts(guess);
   const get = (t: string) => Number(parts.find((p) => p.type === t)!.value);
   const asIf = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour") % 24, get("minute"));
   return new Date(guess.getTime() - (asIf - guess.getTime()));
 }
-function ymd(d: Date) { const p = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(d); const [y, m, dd] = p.split("-").map(Number); return { y, m, d: dd }; }
+export function ymd(d: Date) { const p = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(d); const [y, m, dd] = p.split("-").map(Number); return { y, m, d: dd }; }
 function dow(d: Date) { return new Intl.DateTimeFormat("en-AU", { timeZone: TZ, weekday: "short" }).format(d); }
 
 /** Sean's window for a report run on `runDay` (Melbourne). Mon: Fri 3pm → Mon 7am. Tue–Fri: previous day 3pm → run day 7am. Sat/Sun: treated like Monday's rule is not needed – use previous day 3pm → 7am. */
