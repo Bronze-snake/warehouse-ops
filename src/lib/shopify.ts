@@ -77,8 +77,24 @@ export async function resolveBarcodes(codes: string[]): Promise<Record<string, V
   return out;
 }
 
-/** Add stock at the Online Warehouse. Relative adjustments only (+delta), never "set to". */
+/** Make sure every item is stocked at the Online Warehouse (a store-only item has no level there yet). Activating adds a 0 level – nothing else. */
+async function ensureStockedAtWarehouse(ids: string[]) {
+  type R = { nodes: ({ id: string; inventoryLevel: { id: string } | null } | null)[] };
+  const missing: string[] = [];
+  for (let i = 0; i < ids.length; i += 100) {
+    const d = await gql<R>(`query($ids:[ID!]!,$loc:ID!){ nodes(ids:$ids){ ... on InventoryItem { id inventoryLevel(locationId:$loc){ id } } } }`, { ids: ids.slice(i, i + 100), loc: ONLINE_WAREHOUSE_ID });
+    for (const n of d.nodes) if (n && !n.inventoryLevel) missing.push(n.id);
+  }
+  for (const id of missing) {
+    const d = await gql<{ inventoryActivate: { userErrors: { message: string }[] } }>(`mutation($id:ID!,$loc:ID!){ inventoryActivate(inventoryItemId:$id, locationId:$loc){ userErrors{ message } } }`, { id, loc: ONLINE_WAREHOUSE_ID });
+    if (d.inventoryActivate.userErrors?.length) throw new Error("Could not stock item at Preston: " + d.inventoryActivate.userErrors.map((e) => e.message).join("; "));
+  }
+  return missing.length;
+}
+
+/** Add stock at the Online Warehouse. Relative adjustments only (+delta), never "set to". One atomic Shopify call. */
 export async function receiveIntoWarehouse(lines: { inventory_item_id: string; qty: number }[], reference: string) {
+  await ensureStockedAtWarehouse(lines.map((l) => l.inventory_item_id));
   type R = { inventoryAdjustQuantities: { userErrors: { field: string[] | null; message: string }[]; inventoryAdjustmentGroup: { id: string; createdAt: string } | null } };
   const changes = lines.map((l) => ({ inventoryItemId: l.inventory_item_id, locationId: ONLINE_WAREHOUSE_ID, delta: l.qty }));
   const d = await gql<R>(
