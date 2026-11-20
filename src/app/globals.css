@@ -57,3 +57,4 @@ ul.plist .ptick { width:26px; height:26px; border:2px solid #333; border-radius:
 ul.plist li.done { opacity:.4; } ul.plist li.done .pname { text-decoration:line-through; } ul.plist li.done .ptick { background:#111; color:#fff; border-color:#111; }
 ul.plist li.noloc { background:var(--red); }
 @media print { ul.plist li { break-inside:avoid; padding:5px 2px; } ul.plist .pbin { font-size:14px; } ul.plist .pqty { font-size:14px; } ul.plist li.done { display:none; } details { display:none; } }
+ul.plist li.unknown { background:var(--grey); }

@@ -6,13 +6,30 @@ import { useEffect, useRef, useState } from "react";
 type Detector = { detect: (src: ImageBitmapSource) => Promise<{ rawValue: string }[]> };
 declare global { interface Window { BarcodeDetector?: new (o?: { formats?: string[] }) => Detector & { constructor: { getSupportedFormats?: () => Promise<string[]> } } } }
 
-export default function CameraScan({ onScan, onClose }: { onScan: (code: string) => void; onClose: () => void }) {
+function beep() {
+  try { const C = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext; const ctx = new C(); const o = ctx.createOscillator(); const g = ctx.createGain(); o.type = "square"; o.frequency.value = 1400; g.gain.value = 0.15; o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime + 0.09); setTimeout(() => ctx.close(), 300); } catch {}
+  try { navigator.vibrate?.(60); } catch {}
+}
+
+export type Recent = { code: string; label: string; qty: number };
+
+export default function CameraScan({ onScan, onClose, continuous = false, recent = [], total = 0 }: { onScan: (code: string) => void; onClose: () => void; continuous?: boolean; recent?: Recent[]; total?: number }) {
   const video = useRef<HTMLVideoElement>(null);
   const [err, setErr] = useState<string | null>(null);
   const [engine, setEngine] = useState("");
+  const [flash, setFlash] = useState(false);
+  const last = useRef<{ code: string; at: number }>({ code: "", at: 0 });
   useEffect(() => {
     let stopped = false; let stream: MediaStream | null = null; let zx: { stop: () => void } | null = null; let raf = 0;
-    const finish = (t: string) => { if (stopped) return; stopped = true; try { navigator.vibrate?.(80); } catch {} cleanup(); onScan(t.trim()); };
+    const finish = (raw: string) => {
+      if (stopped) return;
+      const t = raw.trim(); const now = Date.now();
+      if (continuous) {
+        if (t === last.current.code && now - last.current.at < 1800) return; // same label still in view
+        last.current = { code: t, at: now }; beep(); setFlash(true); setTimeout(() => setFlash(false), 250); onScan(t); return;
+      }
+      stopped = true; beep(); cleanup(); onScan(t);
+    };
     const cleanup = () => { cancelAnimationFrame(raf); if (zx) zx.stop(); if (stream) stream.getTracks().forEach((tr) => tr.stop()); };
     (async () => {
       try {
@@ -51,14 +68,26 @@ export default function CameraScan({ onScan, onClose }: { onScan: (code: string)
       } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
     })();
     return cleanup;
-  }, [onScan]);
+  }, [onScan, continuous]);
   return (
     <div style={{ position: "fixed", inset: 0, background: "#000", zIndex: 50, display: "flex", flexDirection: "column" }}>
-      <video ref={video} style={{ flex: 1, width: "100%", objectFit: "cover" }} muted playsInline autoPlay />
-      <div style={{ position: "absolute", left: "8%", right: "8%", top: "42%", height: "16%", border: "2px solid rgba(255,255,255,.85)", borderRadius: 8, pointerEvents: "none", boxShadow: "0 0 0 2000px rgba(0,0,0,.25)" }} />
-      <div style={{ position: "absolute", top: 14, left: 0, right: 0, textAlign: "center", color: "#fff", fontSize: 14, textShadow: "0 1px 3px #000" }}>Line the barcode up in the box · hold steady {engine === "zxing" ? "· 1–2 s" : ""}</div>
+      <video ref={video} style={{ flex: 1, width: "100%", objectFit: "cover", minHeight: 0 }} muted playsInline autoPlay />
+      <div style={{ position: "absolute", left: "8%", right: "8%", top: "30%", height: "14%", border: `3px solid ${flash ? "#3ddc84" : "rgba(255,255,255,.85)"}`, borderRadius: 8, pointerEvents: "none", boxShadow: "0 0 0 2000px rgba(0,0,0,.25)", transition: "border-color .1s" }} />
+      <div style={{ position: "absolute", top: 14, left: 0, right: 0, textAlign: "center", color: "#fff", fontSize: 14, textShadow: "0 1px 3px #000" }}>{continuous ? "Scan each item – it beeps when it's in" : "Line the barcode up in the box · hold steady"}{engine === "zxing" ? " · 1–2 s" : ""}</div>
       {err && <div className="err" style={{ position: "absolute", left: 16, right: 16, top: 48 }}>Camera: {err}. Allow camera access for this site, or type the barcode.</div>}
-      <div style={{ padding: 16, textAlign: "center" }}><button className="secondary" type="button" onClick={onClose}>Cancel</button></div>
+      {continuous && (
+        <div style={{ background: "#111", color: "#fff", padding: "10px 14px 0", maxHeight: "38vh", overflow: "auto" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}><strong style={{ fontSize: 16 }}>{total} scanned</strong><span style={{ color: "#aaa", fontSize: 13 }}>latest first</span></div>
+          {recent.slice(0, 6).map((r, i) => (
+            <div key={r.code + i} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "7px 0", borderTop: "1px solid #333", fontSize: i === 0 ? 17 : 14, fontWeight: i === 0 ? 700 : 400, color: i === 0 ? "#fff" : "#ccc" }}>
+              <span style={{ flex: 1, lineHeight: 1.25 }}>{r.label || r.code}</span><span style={{ fontWeight: 700 }}>×{r.qty}</span>
+            </div>))}
+          {!recent.length && <div style={{ color: "#aaa", padding: "8px 0 4px" }}>Nothing scanned yet.</div>}
+        </div>
+      )}
+      <div style={{ padding: 12, textAlign: "center", background: "#111", display: "flex", gap: 10, justifyContent: "center" }}>
+        {continuous ? <button type="button" onClick={onClose} style={{ flex: 1, fontSize: 18 }}>Done ({total})</button> : <button className="secondary" type="button" onClick={onClose}>Cancel</button>}
+      </div>
     </div>
   );
 }
