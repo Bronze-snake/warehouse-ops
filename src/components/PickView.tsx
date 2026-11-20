@@ -86,7 +86,7 @@ export default function PickView({ id, existing }: { id: number; existing?: bool
 
   return (
     <>
-      <div className="row noprint" style={{ justifyContent: "space-between" }}><a href="/pick" className="btn secondary" style={{ padding: "6px 12px" }}>← Pick lists</a>{finished && <span className="pill received">finished</span>}</div>
+      <div className="row noprint" style={{ justifyContent: "space-between" }}><a href="/pick" className="btn secondary">← Store replen</a>{finished && <span className="pill received">finished</span>}</div>
       <h1 style={{ margin: "8px 0 0" }}>{run.store} <span className="meta" style={{ fontWeight: 400 }}>#{run.id}</span></h1>
       <p className="sub" style={{ marginBottom: 8 }}>Sales {run.label}<br /><span className="meta">{picked} / {units} units · {linesDone} / {inDept.length} lines{finished ? ` · finished by ${run.finished_by}` : ""}</span></p>
       {existing && !finished && <div className="warn noprint">This list was already open for {run.store} on these dates – you&apos;re on the shared one. Rebuild is under More if the stock has changed.</div>}
@@ -98,8 +98,8 @@ export default function PickView({ id, existing }: { id: number; existing?: bool
 
       {!finished && (
         <form onSubmit={gunSubmit} className="row noprint" style={{ margin: "10px 0", gap: 8 }}>
-          <input ref={gunRef} type="text" inputMode="numeric" autoComplete="off" placeholder="Scan barcode here" value={gun} onChange={(e) => setGun(e.target.value)} style={{ flex: 1, fontSize: 18 }} />
-          <button type="button" onClick={() => setCam(true)} style={{ fontSize: 16 }}>📷 Camera</button>
+          <input ref={gunRef} type="text" inputMode="numeric" autoComplete="off" placeholder="Scan barcode here" value={gun} onChange={(e) => setGun(e.target.value)} style={{ flex: 1 }} />
+          <button type="button" onClick={() => setCam(true)}>📷 Scan</button>
         </form>
       )}
       {flash && <div className={(flash.ok ? "ok" : "err") + " noprint"} style={{ fontWeight: 600 }}>{flash.ok ? "✓ " : "✕ "}{flash.text}</div>}

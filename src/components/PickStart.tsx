@@ -37,24 +37,24 @@ export default function PickStart() {
 
   return (
     <>
-      <h1>Pick list</h1>
+      <h1>🛍️ Store replen</h1>
       <p className="sub">Store replen – same rules as the Replen sheet. Pick a store, check the sales dates, Build.</p>
       <div className="card">
         <label>Store</label>
-        <div className="row">{STORES.map((s) => <button key={s.key} type="button" className={store === s.key ? "" : "secondary"} onClick={() => setStore(s.key)} style={{ flex: "1 1 120px", fontSize: 17 }}>{s.name}</button>)}</div>
+        <div className="row">{STORES.map((s) => <button key={s.key} type="button" className={store === s.key ? "" : "secondary"} onClick={() => setStore(s.key)} style={{ flex: "1 1 120px" }}>{s.name}</button>)}</div>
         <div className="row" style={{ marginTop: 8 }}>
           <div style={{ flex: 1 }}><label>Sales from</label><input type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={{ width: "100%", padding: 10, font: "inherit" }} /></div>
           <div style={{ flex: 1 }}><label>to (inclusive)</label><input type="date" value={to} onChange={(e) => setTo(e.target.value)} style={{ width: "100%", padding: 10, font: "inherit" }} /></div>
         </div>
         <div className="row" style={{ marginTop: 14 }}>
-          <button type="button" onClick={() => build(false)} disabled={busy || !store} style={{ flex: 1, fontSize: 18 }}>{busy ? "Building… (20–60 s)" : "Build pick list"}</button>
+          <button type="button" onClick={() => build(false)} disabled={busy || !store} style={{ flex: 1 }}>{busy ? "Building… (20–60 s)" : "Build pick list"}</button>
         </div>
         {err && <div className="err">{err}</div>}
         <p className="meta" style={{ marginTop: 10 }}>If a list for that store and dates is already open, you&apos;ll be taken to it (so two phones share one list). Use “Rebuild” inside the list to refresh it.</p>
       </div>
 
       {open.length > 0 && <>
-        <h2>Open pick lists</h2>
+        <h2>Open lists</h2>
         <table className="list hist"><thead><tr><th>#</th><th>Store</th><th>Sales</th><th>Progress</th><th>Started</th></tr></thead><tbody>
           {open.map((r) => <tr key={r.id}><td><a href={`/pick/${r.id}`}>#{r.id}</a></td><td><a href={`/pick/${r.id}`}>{r.store}</a></td><td>{r.label}</td><td>{r.picked} / {r.units} units</td><td className="meta">{fmt(r.created_at)}</td></tr>)}
         </tbody></table>

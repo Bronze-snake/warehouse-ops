@@ -7,7 +7,7 @@ export default async function Putaway() {
   const lm = await locationMasterInfo();
   return (
     <>
-      <h1>Put away</h1>
+      <h1>📥 Put away</h1>
       <p className="sub">Upload the scan (Barcode, Quantity) or scan straight in. The list comes back in bin order.</p>
       {!shopifyConfigured() && <div className="warn">Shopify isn&apos;t connected on this server yet – lists will build from cached barcodes only and nothing can be received.</div>}
       {!lm.count && <div className="warn">No location master loaded yet – everything will show as No location. <a href="/locations">Upload Sean&apos;s ShipStation CSV</a>.</div>}

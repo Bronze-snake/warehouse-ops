@@ -38,7 +38,7 @@ export default function Finder() {
       {cam && <CameraScan onScan={onScanned} onClose={() => setCam(false)} />}
       <div className="card">
         <input ref={input} type="text" value={term} onChange={(e) => onChange(e.target.value)} onKeyDown={onKey} placeholder="Scan or type…" autoComplete="off" style={{ fontSize: 22, padding: 14 }} />
-        <div className="row" style={{ marginTop: 10 }}><button type="button" onClick={() => setCam(true)}>📷 Scan with camera</button><button type="button" className="secondary" onClick={() => search(term)} disabled={busy}>{busy ? "Looking…" : "Find"}</button><button type="button" className="secondary" onClick={clear}>Clear</button></div>
+        <div className="row" style={{ marginTop: 10 }}><button type="button" onClick={() => setCam(true)}>📷 Scan</button><button type="button" className="secondary" onClick={() => search(term)} disabled={busy}>{busy ? "Looking…" : "Find"}</button><button type="button" className="secondary" onClick={clear}>Clear</button></div>
         <p className="meta" style={{ margin: "8px 0 0" }}>A barcode gun also works – just scan with the box selected.</p>
         {err && <div className="err">{err}</div>}
       </div>

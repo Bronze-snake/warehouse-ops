@@ -35,7 +35,7 @@ export default function ReplenView() {
 
   return (
     <>
-      <h1 style={{ marginBottom: 2 }}>Warehouse replen</h1>
+      <h1 style={{ marginBottom: 2 }}>📦 Warehouse replen</h1>
       {data && <p className="sub" style={{ marginBottom: 10 }}>{data.window}<br /><span className="meta">{lines.length} lines · {total} units · {doneCount} done</span></p>}
       {!data && !err && <p className="sub">Building…</p>}
       <div className="row noprint" style={{ marginBottom: 12, gap: 8 }}>

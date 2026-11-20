@@ -59,7 +59,7 @@ export default function ScanForm() {
     <div className="card">
       {cam && <CameraScan continuous recent={recent} total={total} onScan={onScanned} onClose={() => setCam(false)} />}
       <div className="row">
-        <button type="button" onClick={() => setCam(true)} style={{ fontSize: 18, padding: "14px 20px" }}>📷 Scan items</button>
+        <button type="button" onClick={() => setCam(true)}>📷 Scan</button>
         <label className="btn secondary" style={{ cursor: "pointer" }}>Upload CSV<input type="file" accept=".csv,.txt,text/csv" onChange={onFile} style={{ display: "none" }} /></label>
       </div>
       <label>Barcode gun / type a barcode + Enter</label>
@@ -84,7 +84,7 @@ export default function ScanForm() {
       {showText ? <textarea readOnly value={order.map((c) => `${c},${items[c].qty}`).join("\n")} style={{ marginTop: 10 }} /> : null}
       {err && <div className="err">{err}</div>}
       <div className="row" style={{ marginTop: 14 }}>
-        <button type="button" onClick={submit} disabled={busy || !order.length} style={{ fontSize: 17 }}>{busy ? "Building…" : `Build put-away list${total ? ` (${total})` : ""}`}</button>
+        <button type="button" onClick={submit} disabled={busy || !order.length} >{busy ? "Building…" : `Build put-away list${total ? ` (${total})` : ""}`}</button>
         <button type="button" className="secondary" onClick={() => { setItems({}); setOrder([]); setErr(null); }}>Clear</button>
         <button type="button" className="secondary" onClick={() => setShowText(!showText)} style={{ marginLeft: "auto", fontSize: 13, padding: "6px 10px" }}>{showText ? "Hide" : "Show"} raw</button>
       </div>

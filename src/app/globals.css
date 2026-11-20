@@ -1,4 +1,4 @@
-:root { --ink:#111; --muted:#666; --line:#ddd; --bg:#fff; --soft:#f4f4f4; --red:#fde9e7; --grey:#eeeeee; --green:#e2efda; --accent:#111; }
+:root { --ink:#111; --muted:#666; --line:#ddd; --bg:#f6f2ea; --soft:#f4f4f4; --red:#fde9e7; --grey:#eeeeee; --green:#e2efda; --accent:#111; }
 * { box-sizing:border-box; }
 html,body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
 a { color:inherit; }
@@ -8,7 +8,7 @@ header.top .who { color:var(--muted); font-size:14px; display:flex; gap:12px; al
 main { max-width:1000px; margin:0 auto; padding:20px 16px 60px; }
 h1 { font-size:24px; margin:0 0 6px; } h2 { font-size:18px; margin:24px 0 8px; }
 .sub { color:var(--muted); margin:0 0 18px; }
-.tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px; margin-top:16px; }
+.tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px; margin-top:4px; }
 .tile { display:block; border:1px solid var(--line); border-radius:10px; padding:22px 18px; text-decoration:none; background:#fff; }
 .tile:hover { border-color:#999; } .tile.soon { opacity:.5; pointer-events:none; }
 .tile .t { font-size:20px; font-weight:700; letter-spacing:.03em; } .tile .d { color:var(--muted); margin-top:6px; font-size:14px; }
@@ -16,7 +16,7 @@ h1 { font-size:24px; margin:0 0 6px; } h2 { font-size:18px; margin:24px 0 8px; }
 label { display:block; font-size:14px; color:var(--muted); margin:10px 0 4px; }
 input[type=text],input[type=password],textarea,input[type=file] { width:100%; padding:10px; border:1px solid var(--line); border-radius:8px; font:inherit; }
 textarea { min-height:120px; font-family:ui-monospace,Menlo,Consolas,monospace; }
-button,.btn { display:inline-block; padding:11px 18px; border-radius:8px; border:1px solid var(--accent); background:var(--accent); color:#fff; font:inherit; font-weight:600; cursor:pointer; text-decoration:none; }
+button,.btn { display:inline-block; padding:8px 14px; border-radius:8px; font-size:15px; border:1px solid var(--accent); background:var(--accent); color:#fff; font:inherit; font-weight:600; cursor:pointer; text-decoration:none; }
 button.secondary,.btn.secondary { background:#fff; color:var(--ink); }
 button.danger { background:#b3261e; border-color:#b3261e; }
 button:disabled { opacity:.5; cursor:default; }
@@ -61,7 +61,7 @@ ul.plist li.unknown { background:var(--grey); }
 
 /* pick list */
 .segs { display:flex; border:1px solid var(--line); border-radius:10px; overflow:hidden; margin-top:6px; }
-.segs button { flex:1; background:#fff; color:var(--ink); border:none; border-radius:0; padding:10px 6px; font-weight:600; font-size:15px; }
+.segs button { flex:1; background:#fff; font-size:15px; color:var(--ink); border:none; border-radius:0; padding:10px 6px; font-weight:600; font-size:15px; }
 .segs button + button { border-left:1px solid var(--line); }
 .segs button.on { background:var(--accent); color:#fff; } .segs button small { font-weight:400; opacity:.75; }
 ul.plist.pick li { grid-template-columns:72px 1fr 54px 28px; }
@@ -71,3 +71,7 @@ ul.plist.pick li.open { background:var(--soft); }
 .deptpill { display:inline-block; margin-left:8px; padding:0 6px; border-radius:999px; background:var(--soft); font-size:11px; font-weight:600; color:#555; vertical-align:middle; }
 .deptpill.manual { background:#fff2cc; }
 @media print { .segs { display:none; } ul.plist.pick li { grid-template-columns:60px 1fr 40px 24px; } ul.plist.pick .pactions { display:none; } }
+@media print { html,body { background:#fff; } }
+ul.plist li { background:#fff; }
+.segs { background:#fff; }
+input[type=text],input[type=password],textarea,input[type=file],input[type=date] { background:#fff; }
