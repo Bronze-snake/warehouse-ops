@@ -105,3 +105,30 @@ export async function receiveIntoWarehouse(lines: { inventory_item_id: string; q
   if (r.userErrors?.length) throw new Error(r.userErrors.map((e) => e.message).join("; "));
   return r.inventoryAdjustmentGroup?.id || "";
 }
+
+/** SKU -> variant (barcode, names). Cached variants table first, then Shopify 20 at a time. */
+export async function resolveSkus(skus: string[]): Promise<Record<string, VariantInfo>> {
+  const out: Record<string, VariantInfo> = {};
+  const want = [...new Set(skus.filter(Boolean))];
+  if (!want.length) return out;
+  const cached = await q<VariantInfo>("SELECT barcode, variant_id, inventory_item_id, sku, product, size, colour FROM variants WHERE sku = ANY($1)", [want]);
+  for (const v of cached) if (!out[v.sku]) out[v.sku] = v;
+  const miss = want.filter((s) => !out[s]);
+  if (!miss.length || !shopifyConfigured()) return out;
+  type R = { productVariants: { nodes: { id: string; sku: string | null; title: string; barcode: string | null; product: { title: string }; inventoryItem: { id: string } }[] } };
+  for (let i = 0; i < miss.length; i += 20) {
+    const chunk = miss.slice(i, i + 20);
+    const query = chunk.map((c) => `sku:"${c.replace(/["\\]/g, "")}"`).join(" OR ");
+    const d = await gql<R>(`query($q:String!){ productVariants(first:100, query:$q){ nodes{ id sku title barcode product{ title } inventoryItem{ id } } } }`, { q: query });
+    for (const v of d.productVariants.nodes) {
+      const sku = (v.sku || "").trim(); if (!chunk.includes(sku) || out[sku]) continue;
+      const [size, colour] = splitTitle(v.title);
+      const info: VariantInfo = { barcode: String(v.barcode || "").trim(), variant_id: v.id, inventory_item_id: v.inventoryItem.id, sku, product: v.product.title.replace(/ - FINAL SALE$/i, ""), size, colour };
+      out[sku] = info;
+      if (info.barcode) await q(
+        "INSERT INTO variants(barcode,variant_id,inventory_item_id,sku,product,size,colour,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,now()) ON CONFLICT(barcode) DO UPDATE SET variant_id=EXCLUDED.variant_id, inventory_item_id=EXCLUDED.inventory_item_id, sku=EXCLUDED.sku, product=EXCLUDED.product, size=EXCLUDED.size, colour=EXCLUDED.colour, updated_at=now()",
+        [info.barcode, info.variant_id, info.inventory_item_id, info.sku, info.product, info.size, info.colour]);
+    }
+  }
+  return out;
+}

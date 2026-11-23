@@ -18,7 +18,7 @@ export function buzz() {
 
 export type Recent = { code: string; label: string; qty: number; bad?: boolean };
 
-export default function CameraScan({ onScan, onClose, continuous = false, recent = [], total = 0, hint, totalLabel }: { onScan: (code: string) => void | boolean | Promise<void | boolean>; onClose: () => void; continuous?: boolean; recent?: Recent[]; total?: number; hint?: string; totalLabel?: string }) {
+export default function CameraScan({ onScan, onClose, continuous = false, recent = [], total = 0, hint, totalLabel, next }: { onScan: (code: string) => void | boolean | Promise<void | boolean>; onClose: () => void; continuous?: boolean; recent?: Recent[]; total?: number; hint?: string; totalLabel?: string; next?: string }) {
   const video = useRef<HTMLVideoElement>(null);
   const [err, setErr] = useState<string | null>(null);
   const [engine, setEngine] = useState("");
@@ -84,6 +84,7 @@ export default function CameraScan({ onScan, onClose, continuous = false, recent
       {err && <div className="err" style={{ position: "absolute", left: 16, right: 16, top: 48 }}>Camera: {err}. Allow camera access for this site, or type the barcode.</div>}
       {continuous && (
         <div style={{ background: "#111", color: "#fff", padding: "10px 14px 0", maxHeight: "38vh", overflow: "auto" }}>
+          {next && <div style={{ background: "#2a2a2a", borderRadius: 8, padding: "8px 10px", marginBottom: 8 }}><div style={{ fontSize: 11, color: "#aaa", letterSpacing: ".06em" }}>NEXT</div><div style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.2 }}>{next}</div></div>}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}><strong style={{ fontSize: 16 }}>{totalLabel || `${total} scanned`}</strong><span style={{ color: "#aaa", fontSize: 13 }}>latest first</span></div>
           {recent.slice(0, 6).map((r, i) => (
             <div key={r.code + i} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "7px 0", borderTop: "1px solid #333", fontSize: i === 0 ? 17 : 14, fontWeight: i === 0 ? 700 : 400, color: r.bad ? "#ff8a80" : i === 0 ? "#fff" : "#ccc" }}>
