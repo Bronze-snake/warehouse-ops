@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import CameraScan, { beep, buzz, type Recent } from "./CameraScan";
 
-type Line = { id: number; sku: string; barcode: string; product: string; size: string; colour: string; dept: string; bin: string; sold: number; store_stock: number; wh_stock: number; pick: number; picked: number; picked_by: string | null; method: string | null };
+type Line = { id: number; sku: string; barcode: string; product: string; size: string; colour: string; dept: string; bin: string; sold: number; store_stock: number; wh_stock: number; pick: number; picked: number; picked_by: string | null; method: string | null; note?: string };
 type Run = { id: number; store: string; label: string; status: string; created_at: string; created_by: string; finished_at: string | null; finished_by: string | null; lines: number; units: number; removed: number; orders?: { number: string; name: string; items: number; shipment_id?: string }[]; preview?: boolean; tag?: string | null };
 type Removed = { product: string; size: string; colour: string; sku: string; sold: number; reason: string };
 type Data = { run: Run; lines: Line[]; removed: Removed[] };
@@ -10,7 +10,7 @@ type Dept = string;
 
 const label = (l: Line) => `${l.product} · ${l.size}${l.colour && !l.product.toLowerCase().includes(l.colour.toLowerCase()) ? " · " + l.colour : ""}`;
 
-export type PickConfig = { api: string; backHref: string; backLabel: string; title: (run: Run) => string; subtitle: (run: Run) => string; tabs: string[]; rebuild: boolean; manifest: boolean; existingNote?: string; finishNote?: string; scanHint: string; gun?: boolean };
+export type PickConfig = { api: string; backHref: string; backLabel: string; title: (run: Run) => string; subtitle: (run: Run) => string; tabs: string[]; rebuild: boolean; manifest: boolean; existingNote?: string; finishNote?: string; scanHint: string; gun?: boolean; nameRequired?: boolean; finishLabel?: string; extraLinks?: { label: string; href: (id: number) => string }[]; removedTitle?: string };
 export const STORE_CONFIG: PickConfig = { api: "/api/pick", backHref: "/pick", backLabel: "Store replen", title: (r) => r.store, subtitle: (r) => `Sales ${r.label}`, tabs: ["Womens", "Mens"], rebuild: true, manifest: true, existingNote: "This list was already open for this store on these dates – you're on the shared one. Rebuild is under More if the stock has changed.", finishNote: "Finish this pick list? It locks the list and records what was sent.", scanHint: "scan each item as you pick it", gun: true };
 
 export default function PickView({ id, existing, cfg = STORE_CONFIG }: { id: number; existing?: boolean; cfg?: PickConfig }) {
@@ -25,6 +25,9 @@ export default function PickView({ id, existing, cfg = STORE_CONFIG }: { id: num
   const [gun, setGun] = useState("");
   const [busy, setBusy] = useState(false);
   const gunRef = useRef<HTMLInputElement>(null);
+  const [who, setWho] = useState("");
+  useEffect(() => { try { setWho(localStorage.getItem("ops-name") || localStorage.getItem("putaway-name") || ""); } catch {} }, []);
+  function saveWho(v: string) { setWho(v); try { localStorage.setItem("ops-name", v); } catch {} }
   const deptKey = `${cfg.api}-dept:${id}`;
 
   const load = useCallback(async () => {
@@ -42,7 +45,7 @@ export default function PickView({ id, existing, cfg = STORE_CONFIG }: { id: num
   const scan = useCallback(async (code: string): Promise<boolean> => {
     const c = code.trim(); if (!c) return false;
     try {
-      const r = await fetch(`${cfg.api}/${id}/scan`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ barcode: c, dept: dept || null }) });
+      const r = await fetch(`${cfg.api}/${id}/scan`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ barcode: c, dept: dept || null, by: who || undefined }) });
       const j = await r.json();
       if (j.ok) {
         patch(j.line);
@@ -53,7 +56,7 @@ export default function PickView({ id, existing, cfg = STORE_CONFIG }: { id: num
       const t = j.line ? `${j.message}: ${label(j.line)}` : j.message || "Not on this list";
       show(false, t); setRecent((xs) => [{ code: c, label: t, qty: 0, bad: true }, ...xs].slice(0, 12)); return false;
     } catch { show(false, "Network error – try again"); return false; }
-  }, [id, dept]);
+  }, [id, dept, who]);
 
   async function gunSubmit(e: React.FormEvent) { e.preventDefault(); const c = gun; setGun(""); if (!c.trim()) return; const ok = await scan(c); if (ok) beep(); else buzz(); gunRef.current?.focus(); }
   // Gun mode: the barcode box stays focused (no on-screen keyboard), and keystrokes that land anywhere else on the page are
@@ -77,17 +80,18 @@ export default function PickView({ id, existing, cfg = STORE_CONFIG }: { id: num
   }, [data, cam, scan, cfg.gun]);
 
   async function override(line: Line, action: "pick" | "undo" | "skip") {
-    const r = await fetch(`${cfg.api}/${id}/override`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ line: line.id, action }) });
+    const r = await fetch(`${cfg.api}/${id}/override`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ line: line.id, action, by: who || undefined }) });
     const j = await r.json(); if (j.line) patch(j.line); setOpenLine(null);
   }
   async function finish() {
     if (!data) return;
     const left = data.lines.filter((l) => l.picked < l.pick && l.method !== "skipped"); const sk = data.lines.filter((l) => l.method === "skipped").length;
     const msg = left.length ? `${left.length} line${left.length === 1 ? "" : "s"} not fully picked${sk ? ` (plus ${sk} skipped)` : ""}. Finish anyway? Only what was picked goes to the Sent log.` : (cfg.finishNote || "Finish this list?") + (sk ? ` ${sk} skipped line${sk === 1 ? "" : "s"} will not be sent.` : "");
+    if (cfg.nameRequired && !who.trim()) { setErr("Put your name in first (top of the page)."); return; }
     if (!confirm(msg)) return;
     setBusy(true);
-    const r = await fetch(`${cfg.api}/${id}/finish`, { method: "POST" }); const j = await r.json();
-    if (!r.ok) setErr(j.message || "Could not finish"); await load(); setBusy(false);
+    const r = await fetch(`${cfg.api}/${id}/finish`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ by: who || undefined }) }); const j = await r.json();
+    if (!r.ok) setErr(j.message || "Could not finish"); else if (j.units) setFlash({ ok: true, text: `Done – ${j.units} units across ${j.sent} lines adjusted in Shopify.` }); await load(); setBusy(false);
   }
   async function rebuild() {
     if (!data || !confirm("Rebuild this list from Shopify now? Picks already made on this list are kept in history but the new list starts fresh.")) return;
@@ -115,6 +119,7 @@ export default function PickView({ id, existing, cfg = STORE_CONFIG }: { id: num
       <p className="sub" style={{ marginBottom: 8 }}>{cfg.subtitle(run)}<br /><span className="meta">{picked} / {units} units · {linesDone} / {inDept.length} lines{skippedCount ? ` · ${skippedCount} skipped` : ""}{finished ? ` · finished by ${run.finished_by}` : ""}</span></p>
       {existing && !finished && cfg.existingNote && <div className="warn noprint">{cfg.existingNote}</div>}
       {err && <div className="err">{err}</div>}
+      {cfg.nameRequired && !finished && <div className="row noprint" style={{ margin: "4px 0 8px" }}><label style={{ margin: 0 }}>Your name</label><input type="text" value={who} onChange={(e) => saveWho(e.target.value)} placeholder="e.g. Kirsten" style={{ maxWidth: 200 }} /></div>}
 
       <div className="segs noprint">
         {["", ...cfg.tabs].map((d) => <button key={d} type="button" className={dept === d ? "on" : ""} onClick={() => pickDept(d)}>{d || "All"}{d && <small> {counts[d]}</small>}</button>)}
@@ -130,12 +135,14 @@ export default function PickView({ id, existing, cfg = STORE_CONFIG }: { id: num
 
       <div className="row noprint" style={{ marginBottom: 8, gap: 8 }}>
         <button type="button" className="secondary" onClick={() => setHideDone(!hideDone)}>{hideDone ? "Show picked" : "Hide picked"}</button>
+        {cfg.finishLabel && !finished && <button type="button" onClick={finish} disabled={busy || picked === 0}>{cfg.finishLabel}{picked ? ` (${picked})` : ""}</button>}
         <details style={{ marginLeft: "auto" }}><summary className="meta" style={{ cursor: "pointer", padding: "8px 4px" }}>More</summary>
           <div className="row" style={{ marginTop: 8, justifyContent: "flex-end" }}>
             <button type="button" className="secondary" onClick={() => window.print()}>Print</button>
             {cfg.manifest && <a className="btn secondary" href={`${cfg.api}/${id}/manifest`}>Export CSV</a>}
+            {cfg.extraLinks?.map((x) => <a key={x.label} className="btn secondary" href={x.href(id)}>{x.label}</a>)}
             {!finished && cfg.rebuild && <button type="button" className="secondary" onClick={rebuild} disabled={busy}>Rebuild</button>}
-            {!finished && <button type="button" onClick={finish} disabled={busy}>Finish</button>}
+            {!finished && <button type="button" onClick={finish} disabled={busy}>{cfg.finishLabel || "Finish"}</button>}
           </div>
         </details>
       </div>
@@ -146,7 +153,7 @@ export default function PickView({ id, existing, cfg = STORE_CONFIG }: { id: num
           return (
             <li key={l.id} className={(done ? "done " : "") + (l.bin ? "" : "noloc ") + (open ? "open" : "")} onClick={() => setOpenLine(open ? null : l.id)}>
               <div className="pbin">{l.bin || "no bin"}</div>
-              <div className="pbody"><div className="pname">{l.product}</div><div className="psize">{[l.size, l.colour && !l.product.toLowerCase().includes(l.colour.toLowerCase()) ? l.colour : ""].filter(Boolean).join(" · ")}{!dept && <span className="deptpill">{l.dept}</span>}{l.method === "manual" && <span className="deptpill manual">manual</span>}{skipped && <span className="deptpill skipped">skipped</span>}</div>
+              <div className="pbody"><div className="pname">{l.product}</div><div className="psize">{[l.size, l.colour && !l.product.toLowerCase().includes(l.colour.toLowerCase()) ? l.colour : ""].filter(Boolean).join(" · ")}{!dept && <span className="deptpill">{l.dept}</span>}{l.method === "manual" && <span className="deptpill manual">manual</span>}{skipped && <span className="deptpill skipped">skipped</span>}</div>{l.note && <div className="pnote">{l.note}</div>}
                 {open && <div className="pactions" onClick={(e) => e.stopPropagation()}>
                   <div className="meta">Sold {l.sold} · store has {l.store_stock} · warehouse {l.wh_stock}{l.sku ? ` · ${l.sku}` : ""}{l.picked_by ? ` · picked by ${l.picked_by}` : ""}</div>
                   {!finished && <div className="row" style={{ marginTop: 6 }}>
@@ -171,7 +178,7 @@ export default function PickView({ id, existing, cfg = STORE_CONFIG }: { id: num
         </details>
       )}
       {data.removed.length > 0 && (
-        <details className="noprint" style={{ marginTop: 18 }}><summary className="meta" style={{ cursor: "pointer" }}>Sold but not sent ({data.removed.length})</summary>
+        <details className="noprint" style={{ marginTop: 18 }}><summary className="meta" style={{ cursor: "pointer" }}>{cfg.removedTitle || "Sold but not sent"} ({data.removed.length})</summary>
           <table className="list"><thead><tr><th>Product</th><th>Size</th><th>Sold</th><th>Why</th></tr></thead><tbody>
             {data.removed.map((r, i) => <tr key={i}><td>{r.product}</td><td>{r.size}</td><td>{r.sold}</td><td className="meta">{r.reason}</td></tr>)}
           </tbody></table>
