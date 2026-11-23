@@ -61,7 +61,7 @@ export default function ScanForm() {
 
   return (
     <div className="card">
-      {cam && <CameraScan continuous recent={recent} total={total} onScan={onScanned} onClose={() => setCam(false)} />}
+      {cam && <CameraScan continuous compact recent={recent} total={total} onScan={onScanned} onClose={() => setCam(false)} hint="Put away – scan each item, it beeps when it's in" />}
       <label>Your name <span className="meta">(saved on this phone · shows on the batch and in Shopify&apos;s inventory history)</span></label>
       <input type="text" value={who} onChange={(e) => setName(e.target.value)} placeholder="e.g. Kirsten" autoComplete="given-name" style={{ marginBottom: 10, maxWidth: 260 }} />
       <div className="row">

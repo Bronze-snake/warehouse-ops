@@ -18,7 +18,7 @@ export function buzz() {
 
 export type Recent = { code: string; label: string; qty: number; bad?: boolean };
 
-export default function CameraScan({ onScan, onClose, continuous = false, recent = [], total = 0, hint, totalLabel, next, nextItem, onSkip }: { onScan: (code: string) => void | boolean | Promise<void | boolean>; onClose: () => void; continuous?: boolean; recent?: Recent[]; total?: number; hint?: string; totalLabel?: string; next?: string; nextItem?: { bin: string; product: string; size: string; qty: number } | null; onSkip?: () => void }) {
+export default function CameraScan({ onScan, onClose, continuous = false, recent = [], total = 0, hint, totalLabel, next, nextItem, onSkip, compact: compactProp }: { onScan: (code: string) => void | boolean | Promise<void | boolean>; onClose: () => void; continuous?: boolean; recent?: Recent[]; total?: number; hint?: string; totalLabel?: string; next?: string; nextItem?: { bin: string; product: string; size: string; qty: number } | null; onSkip?: () => void; compact?: boolean }) {
   const video = useRef<HTMLVideoElement>(null);
   const frame = useRef<HTMLDivElement>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -31,7 +31,7 @@ export default function CameraScan({ onScan, onClose, continuous = false, recent
   const last = useRef<{ code: string; at: number }>({ code: "", at: 0 });   // last ACCEPTED scan
   const seen = useRef<{ code: string; at: number }>({ code: "", at: 0 });   // last DETECTED frame
   const inflight = useRef(false);
-  const compact = nextItem !== undefined;
+  const compact = compactProp || nextItem !== undefined;
 
   async function setZoomLevel(z: number) {
     const t = trackRef.current; if (!t) return;
