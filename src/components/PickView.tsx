@@ -175,7 +175,7 @@ export default function PickView({ id, existing, cfg = STORE_CONFIG }: { id: num
         </details>
       )}
 
-      {cam && <CameraScan continuous next={!cfg.gun ? undefined : (() => { const n = shown.find((l) => l.picked < l.pick); return n ? `${n.bin || "no bin"} · ${n.product} · ${n.size}${n.pick > 1 ? ` ×${n.pick - n.picked}` : ""}` : "All picked"; })()} onScan={scan} onClose={() => { setCam(false); load(); }} recent={recent} total={picked} hint={`${cfg.title(run)}${dept ? " · " + dept : ""} — ${cfg.scanHint}`} totalLabel={`${picked} / ${units} units`} />}
+      {cam && <CameraScan continuous nextItem={!cfg.gun ? undefined : (() => { const n = shown.find((l) => l.picked < l.pick); return n ? { bin: n.bin, product: n.product, size: n.size, qty: n.pick - n.picked } : null; })()} onScan={scan} onClose={() => { setCam(false); load(); }} recent={recent} total={picked} hint={`${cfg.title(run)}${dept ? " · " + dept : ""} — ${cfg.scanHint}`} totalLabel={`${picked} / ${units} units`} />}
     </>
   );
 }
