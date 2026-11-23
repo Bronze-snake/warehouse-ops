@@ -25,19 +25,33 @@ export default function BatchPlanner({ configured }: { configured: boolean }) {
   }
   useEffect(() => { if (configured) load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [configured]);
 
+  const [progress, setProgress] = useState<{ done: number; failed: number; total: number } | null>(null);
+  // Tagging is paced (ShipStation allows ~40 calls a minute), so the server works in ~45 s slices and we keep asking for the next one.
+  async function runJob(url: string, startBody: Record<string, unknown>, doneText: (j: { done: number; failed: number; total: number; batches?: number }) => string) {
+    const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ phase: "start", ...startBody }) });
+    const j0 = await r.json(); if (!r.ok) throw new Error(j0.error || "Failed");
+    let job = j0.job as { done: number; failed: number; total: number; batches?: number };
+    setProgress(job);
+    while (job && job.done + job.failed < job.total) {
+      const s = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ phase: "step" }) });
+      const js = await s.json(); if (!s.ok) throw new Error(js.error || "Failed mid-way – press again to continue");
+      job = js.job; setProgress(job);
+    }
+    setProgress(null); setDone(doneText(job));
+  }
   async function apply() {
-    if (!plan || !confirm(`Tag ${plan.untagged} orders into ${plan.batches.length} batches (BATCH-01 … BATCH-${String(plan.batches.length).padStart(2, "0")}) in ShipStation? Tags only – nothing else changes.`)) return;
-    setBusy("apply"); setErr(null);
-    try { const r = await fetch("/api/batches/apply", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ singles, multis, express }) }); const j = await r.json(); if (!r.ok) throw new Error(j.error || "Failed"); setDone(`Tagged ${j.tagged} orders into ${j.batches} batches${j.failed ? ` (${j.failed} failed – they stay untagged)` : ""}. In ShipStation: Awaiting Shipment → filter by tag → print.`); await load(); }
+    if (!plan || !confirm(`Tag ${plan.untagged} orders into ${plan.batches.length} batches (BATCH-01 … BATCH-${String(plan.batches.length).padStart(2, "0")}) in ShipStation? Tags only – nothing else changes. Takes about ${Math.ceil(plan.untagged * 1.6 / 60)} min – keep this page open.`)) return;
+    setBusy("apply"); setErr(null); setDone(null);
+    try { await runJob("/api/batches/apply", { singles, multis, express }, (j) => `Tagged ${j.done} orders into ${j.batches} batches${j.failed ? ` (${j.failed} failed – they stay untagged)` : ""}. In ShipStation: Awaiting Shipment → filter by tag → print.`); await load(); }
     catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
-    setBusy("");
+    setBusy(""); setProgress(null);
   }
   async function clear() {
     if (!confirm("Remove BATCH tags from every order still awaiting shipment, so you can re-plan? Already-shipped orders are untouched.")) return;
-    setBusy("clear"); setErr(null);
-    try { const r = await fetch("/api/batches/clear", { method: "POST" }); const j = await r.json(); if (!r.ok) throw new Error(j.error || "Failed"); setDone(`Cleared tags from ${j.cleared} orders.`); await load(); }
+    setBusy("clear"); setErr(null); setDone(null);
+    try { await runJob("/api/batches/clear", {}, (j) => `Cleared tags from ${j.done} orders.`); await load(); }
     catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
-    setBusy("");
+    setBusy(""); setProgress(null);
   }
 
   return (
@@ -52,6 +66,7 @@ export default function BatchPlanner({ configured }: { configured: boolean }) {
       </div>
       {err && <div className="err">{err}</div>}
       {done && <div className="ok">{done}</div>}
+      {progress && <div className="warn">{busy === "clear" ? "Clearing" : "Tagging"} in ShipStation… {progress.done + progress.failed} / {progress.total}{progress.failed ? ` (${progress.failed} failed)` : ""} — keep this page open.</div>}
       {plan && (
         <>
           <p className="meta" style={{ margin: "12px 0 6px" }}>

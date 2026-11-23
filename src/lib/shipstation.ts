@@ -15,7 +15,7 @@ async function ss<T>(path: string, init: RequestInit = {}): Promise<T> {
   throw new Error("ShipStation rate-limited repeatedly");
 }
 
-export type SSItem = { sku: string; name: string; quantity: number; external_order_item_id: string | null };
+export type SSItem = { sku: string; name: string; quantity: number; external_order_item_id: string | null; bin?: string };
 export type SSShipment = { shipment_id: string; shipment_number: string; external_order_id: string | null; created_at: string; ship_to_name: string; tags: string[]; items: SSItem[]; warehouse_id: string | null; service_code: string | null; carrier_id: string | null; carrier: string; units: number };
 
 type Raw = { shipment_id: string; shipment_number: string | null; external_shipment_id: string | null; external_order_id: string | null; created_at: string; shipment_status: string; warehouse_id: string | null; service_code: string | null; carrier_id: string | null; ship_to: { name: string | null } | null; tags: { name: string }[]; items: { sku: string | null; name: string | null; quantity: number; external_order_item_id: string | null }[] };
