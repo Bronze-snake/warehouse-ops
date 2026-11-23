@@ -110,14 +110,16 @@ export async function scanWave(runId: number, barcode: string, by: string, dept?
   if (dept && !inDept.length) return { ok: false as const, reason: "wrong_dept", line: cands[0], message: `That's on the ${cands[0].dept} list` };
   const open = inDept.find((c) => c.picked < c.pick);
   if (!open) return { ok: false as const, reason: "already_picked", line: inDept[0], message: `Already picked ${inDept[0].picked} of ${inDept[0].pick}` };
-  const [line] = await q<PickLine>("UPDATE wave_lines SET picked=picked+1, picked_by=$2, picked_at=now(), method=COALESCE(method,'scan') WHERE id=$1 RETURNING *", [open.id, by]);
+  const [line] = await q<PickLine>("UPDATE wave_lines SET picked=picked+1, picked_by=$2, picked_at=now(), method=CASE WHEN method='skipped' OR method IS NULL THEN 'scan' ELSE method END WHERE id=$1 RETURNING *", [open.id, by]);
   return { ok: true as const, line, complete: line.picked >= line.pick };
 }
 
-export async function overrideWave(runId: number, lineId: number, action: "pick" | "undo", by: string) {
+export async function overrideWave(runId: number, lineId: number, action: "pick" | "undo" | "skip", by: string) {
   await ensure();
   const r = action === "pick"
     ? await q<PickLine>("UPDATE wave_lines SET picked=pick, picked_by=$3, picked_at=now(), method='manual' WHERE id=$1 AND run_id=$2 RETURNING *", [lineId, runId, by])
+    : action === "skip"
+    ? await q<PickLine>("UPDATE wave_lines SET picked_by=$3, picked_at=now(), method='skipped' WHERE id=$1 AND run_id=$2 RETURNING *", [lineId, runId, by])
     : await q<PickLine>("UPDATE wave_lines SET picked=0, picked_by=NULL, picked_at=NULL, method=NULL WHERE id=$1 AND run_id=$2 RETURNING *", [lineId, runId]);
   return r[0] || null;
 }

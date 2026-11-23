@@ -75,3 +75,5 @@ ul.plist.pick li.open { background:var(--soft); }
 ul.plist li { background:#fff; }
 .segs { background:#fff; }
 input[type=text],input[type=password],textarea,input[type=file],input[type=date] { background:#fff; }
+.deptpill.skipped { background:#fde9e7; color:#8a2e27; }
+ul.plist li.done .deptpill.skipped { opacity:1; }

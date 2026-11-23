@@ -76,14 +76,14 @@ export default function PickView({ id, existing, cfg = STORE_CONFIG }: { id: num
     return () => { document.removeEventListener("keydown", onKey); document.removeEventListener("visibilitychange", onVis); clearInterval(t); };
   }, [data, cam, scan, cfg.gun]);
 
-  async function override(line: Line, action: "pick" | "undo") {
+  async function override(line: Line, action: "pick" | "undo" | "skip") {
     const r = await fetch(`${cfg.api}/${id}/override`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ line: line.id, action }) });
     const j = await r.json(); if (j.line) patch(j.line); setOpenLine(null);
   }
   async function finish() {
     if (!data) return;
-    const left = data.lines.filter((l) => l.picked < l.pick);
-    const msg = left.length ? `${left.length} line${left.length === 1 ? "" : "s"} not fully picked. Finish anyway? Only what was picked goes to the Sent log.` : (cfg.finishNote || "Finish this list?");
+    const left = data.lines.filter((l) => l.picked < l.pick && l.method !== "skipped"); const sk = data.lines.filter((l) => l.method === "skipped").length;
+    const msg = left.length ? `${left.length} line${left.length === 1 ? "" : "s"} not fully picked${sk ? ` (plus ${sk} skipped)` : ""}. Finish anyway? Only what was picked goes to the Sent log.` : (cfg.finishNote || "Finish this list?") + (sk ? ` ${sk} skipped line${sk === 1 ? "" : "s"} will not be sent.` : "");
     if (!confirm(msg)) return;
     setBusy(true);
     const r = await fetch(`${cfg.api}/${id}/finish`, { method: "POST" }); const j = await r.json();
@@ -101,7 +101,9 @@ export default function PickView({ id, existing, cfg = STORE_CONFIG }: { id: num
   const { run } = data;
   const finished = run.status !== "open";
   const inDept = data.lines.filter((l) => !dept || l.dept === dept);
-  const shown = inDept.filter((l) => !hideDone || l.picked < l.pick);
+  const isDone = (l: Line) => l.picked >= l.pick || l.method === "skipped";
+  const shown = inDept.filter((l) => !hideDone || !isDone(l));
+  const skippedCount = inDept.filter((l) => l.method === "skipped").length;
   const units = inDept.reduce((a, l) => a + l.pick, 0), picked = inDept.reduce((a, l) => a + Math.min(l.picked, l.pick), 0);
   const linesDone = inDept.filter((l) => l.picked >= l.pick).length;
   const counts: Record<string, number> = {}; for (const t of cfg.tabs) counts[t] = data.lines.filter((l) => l.dept === t).length;
@@ -110,7 +112,7 @@ export default function PickView({ id, existing, cfg = STORE_CONFIG }: { id: num
     <>
       <div className="row noprint" style={{ justifyContent: "space-between" }}><a href={cfg.backHref} className="btn secondary">← {cfg.backLabel}</a>{finished && <span className="pill received">finished</span>}{run.preview && <span className="pill">preview</span>}</div>
       <h1 style={{ margin: "8px 0 0" }}>{cfg.title(run)} <span className="meta" style={{ fontWeight: 400 }}>#{run.id}</span></h1>
-      <p className="sub" style={{ marginBottom: 8 }}>{cfg.subtitle(run)}<br /><span className="meta">{picked} / {units} units · {linesDone} / {inDept.length} lines{finished ? ` · finished by ${run.finished_by}` : ""}</span></p>
+      <p className="sub" style={{ marginBottom: 8 }}>{cfg.subtitle(run)}<br /><span className="meta">{picked} / {units} units · {linesDone} / {inDept.length} lines{skippedCount ? ` · ${skippedCount} skipped` : ""}{finished ? ` · finished by ${run.finished_by}` : ""}</span></p>
       {existing && !finished && cfg.existingNote && <div className="warn noprint">{cfg.existingNote}</div>}
       {err && <div className="err">{err}</div>}
 
@@ -140,21 +142,22 @@ export default function PickView({ id, existing, cfg = STORE_CONFIG }: { id: num
 
       <ul className="plist pick">
         {shown.map((l) => {
-          const done = l.picked >= l.pick; const open = openLine === l.id;
+          const done = isDone(l); const skipped = l.method === "skipped"; const open = openLine === l.id;
           return (
             <li key={l.id} className={(done ? "done " : "") + (l.bin ? "" : "noloc ") + (open ? "open" : "")} onClick={() => setOpenLine(open ? null : l.id)}>
               <div className="pbin">{l.bin || "no bin"}</div>
-              <div className="pbody"><div className="pname">{l.product}</div><div className="psize">{[l.size, l.colour && !l.product.toLowerCase().includes(l.colour.toLowerCase()) ? l.colour : ""].filter(Boolean).join(" · ")}{!dept && <span className="deptpill">{l.dept}</span>}{l.method === "manual" && <span className="deptpill manual">manual</span>}</div>
+              <div className="pbody"><div className="pname">{l.product}</div><div className="psize">{[l.size, l.colour && !l.product.toLowerCase().includes(l.colour.toLowerCase()) ? l.colour : ""].filter(Boolean).join(" · ")}{!dept && <span className="deptpill">{l.dept}</span>}{l.method === "manual" && <span className="deptpill manual">manual</span>}{skipped && <span className="deptpill skipped">skipped</span>}</div>
                 {open && <div className="pactions" onClick={(e) => e.stopPropagation()}>
                   <div className="meta">Sold {l.sold} · store has {l.store_stock} · warehouse {l.wh_stock}{l.sku ? ` · ${l.sku}` : ""}{l.picked_by ? ` · picked by ${l.picked_by}` : ""}</div>
                   {!finished && <div className="row" style={{ marginTop: 6 }}>
                     {!done && <button type="button" className="secondary" onClick={() => override(l, "pick")}>Pick without scanning</button>}
-                    {l.picked > 0 && <button type="button" className="secondary" onClick={() => override(l, "undo")}>Undo</button>}
+                    {!done && <button type="button" className="secondary" onClick={() => override(l, "skip")}>Skip – can&apos;t send</button>}
+                    {(l.picked > 0 || skipped) && <button type="button" className="secondary" onClick={() => override(l, "undo")}>Undo</button>}
                   </div>}
                 </div>}
               </div>
               <div className="pqty">{l.pick > 1 || l.picked > 0 ? <><span className={l.picked ? "got" : ""}>{Math.min(l.picked, l.pick)}</span><small>/{l.pick}</small></> : l.pick}</div>
-              <div className="ptick">{done ? "✓" : ""}</div>
+              <div className="ptick">{skipped ? "–" : done ? "✓" : ""}</div>
             </li>);
         })}
       </ul>
@@ -175,7 +178,7 @@ export default function PickView({ id, existing, cfg = STORE_CONFIG }: { id: num
         </details>
       )}
 
-      {cam && <CameraScan continuous nextItem={!cfg.gun ? undefined : (() => { const n = shown.find((l) => l.picked < l.pick); return n ? { bin: n.bin, product: n.product, size: n.size, qty: n.pick - n.picked } : null; })()} onScan={scan} onClose={() => { setCam(false); load(); }} recent={recent} total={picked} hint={`${cfg.title(run)}${dept ? " · " + dept : ""} — ${cfg.scanHint}`} totalLabel={`${picked} / ${units} units`} />}
+      {cam && <CameraScan continuous nextItem={!cfg.gun ? undefined : (() => { const n = shown.find((l) => !isDone(l)); return n ? { bin: n.bin, product: n.product, size: n.size, qty: n.pick - n.picked } : null; })()} onSkip={!cfg.gun || finished ? undefined : () => { const n = shown.find((l) => !isDone(l)); if (n && confirm(`Skip ${n.product} ${n.size}? It stays on the list marked skipped and won't go to the store.`)) override(n, "skip"); }} onScan={scan} onClose={() => { setCam(false); load(); }} recent={recent} total={picked} hint={`${cfg.title(run)}${dept ? " · " + dept : ""} — ${cfg.scanHint}`} totalLabel={`${picked} / ${units} units`} />}
     </>
   );
 }
