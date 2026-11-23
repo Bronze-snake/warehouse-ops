@@ -6,6 +6,7 @@ type Hit = { sku: string; bin: string; name: string; size?: string; colour?: str
 export default function Finder() {
   const [term, setTerm] = useState("");
   const [hits, setHits] = useState<Hit[] | null>(null);
+  const [trace, setTrace] = useState<{ batch_id: number; qty: number; bin: string; created_at: string; created_by: string; received_at: string | null; received_by: string | null }[]>([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [cam, setCam] = useState(false);
@@ -19,7 +20,7 @@ export default function Finder() {
     try {
       const r = await fetch("/api/find?q=" + encodeURIComponent(s));
       const j = await r.json(); if (!r.ok) throw new Error(j.error || "Search failed");
-      setHits(j.hits);
+      setHits(j.hits); setTrace(j.trace || []);
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
     setBusy(false);
   }
@@ -48,6 +49,12 @@ export default function Finder() {
           <div style={{ fontSize: 64, fontWeight: 800, letterSpacing: ".02em", lineHeight: 1 }}>{first.bin || "NO BIN"}</div>
           <div style={{ fontSize: 20, marginTop: 10 }}>{first.name}</div>
           <div className="meta">{[first.size, first.colour].filter(Boolean).join(" · ")} · {first.sku}</div>
+          {trace.length > 0 && (
+            <div style={{ textAlign: "left", marginTop: 16, borderTop: "1px solid #eee", paddingTop: 10 }}>
+              <div className="meta" style={{ fontWeight: 600, marginBottom: 4 }}>Last put away</div>
+              {trace.map((t) => <div key={t.batch_id} style={{ fontSize: 14, padding: "3px 0" }}>{new Date(t.received_at || t.created_at).toLocaleString("en-AU", { timeZone: "Australia/Melbourne", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })} · <strong>{t.received_by || t.created_by}</strong> · {t.qty} to {t.bin || "no bin"} · <a href={`/putaway/${t.batch_id}`}>batch #{t.batch_id}</a>{!t.received_at && <span className="meta"> (not received)</span>}</div>)}
+            </div>
+          )}
         </div>
       )}
       {hits && hits.length > (first?.via === "barcode" ? 1 : 0) && (

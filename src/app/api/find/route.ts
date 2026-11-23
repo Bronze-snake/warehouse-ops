@@ -26,7 +26,10 @@ export async function GET(req: Request) {
         const sib = await q<{ sku: string; bin: string; name: string }>("SELECT sku, bin, name FROM bins WHERE sku LIKE $1 AND sku<>$2 ORDER BY sku LIMIT 30", [prefix + "-%", v.sku]);
         for (const s of sib) hits.push({ sku: s.sku, bin: s.bin, name: s.name || v.product, size: s.sku.slice(prefix.length + 1), via: "style" });
       }
-      return NextResponse.json({ hits, mode: "barcode" });
+      // trace: last put-aways of this exact SKU (who, when, which bin it was shelved to)
+      const trace = await q<{ batch_id: number; qty: number; bin: string; created_at: string; created_by: string; received_at: string | null; received_by: string | null }>(
+        "SELECT l.batch_id, l.qty, l.bin, b.created_at, b.created_by, b.received_at, b.received_by FROM putaway_lines l JOIN putaway_batches b ON b.id=l.batch_id WHERE l.sku=$1 ORDER BY b.id DESC LIMIT 5", [v.sku]);
+      return NextResponse.json({ hits, mode: "barcode", trace });
     }
   }
 

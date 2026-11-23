@@ -1,13 +1,17 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function ReceiveButton({ id, status, units, lines, unknown }: { id: number; status: string; units: number; lines: number; unknown: number }) {
   const [state, setState] = useState<{ busy: boolean; msg?: string; ok?: boolean; dup?: boolean }>({ busy: false });
+  const [who, setWho] = useState("");
+  useEffect(() => { try { setWho(localStorage.getItem("putaway-name") || ""); } catch {} }, []);
   if (status === "received") return <div className="ok">Received into Preston – stock is in Shopify.</div>;
   async function go(force = false) {
+    if (!who.trim()) { setState({ busy: false, ok: false, msg: "Put your name in first." }); return; }
+    try { localStorage.setItem("putaway-name", who.trim()); } catch {}
     if (!confirm(`Add ${units} units across ${lines} variants to Online Warehouse (Preston)?\n\nThis replaces the Easy Scan upload – don't do both.${unknown ? `\n\n${unknown} unknown barcode(s) will be skipped.` : ""}`)) return;
     setState({ busy: true });
-    const res = await fetch("/api/putaway/receive", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, force }) });
+    const res = await fetch("/api/putaway/receive", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, force, by: who.trim() }) });
     const j = await res.json();
     if (j.ok) { setState({ busy: false, ok: true, msg: `Done – ${j.units} units added to Preston.` }); setTimeout(() => window.location.reload(), 800); }
     else setState({ busy: false, ok: false, msg: j.reason, dup: !!j.duplicateOf });
@@ -15,7 +19,7 @@ export default function ReceiveButton({ id, status, units, lines, unknown }: { i
   return (
     <div className="card">
       <div className="row" style={{ justifyContent: "space-between" }}>
-        <div><strong>Receive into Preston</strong><div className="meta">Adds {units} units across {lines} variants to Online Warehouse. One click, one confirm.</div></div>
+        <div><strong>Receive into Preston</strong><div className="meta">Adds {units} units across {lines} variants to Online Warehouse. One click, one confirm.</div><input type="text" value={who} onChange={(e) => setWho(e.target.value)} placeholder="Your name" style={{ marginTop: 8, maxWidth: 220 }} /></div>
         <button onClick={() => go(false)} disabled={state.busy || !lines}>{state.busy ? "Posting…" : "Receive into Preston"}</button>
       </div>
       {state.msg && <div className={state.ok ? "ok" : "err"} style={{ marginBottom: 0 }}>{state.msg}

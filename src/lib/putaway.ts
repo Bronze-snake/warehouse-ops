@@ -101,7 +101,7 @@ export async function receiveBatch(id: number, by: string, force = false): Promi
   for (const l of post) merged[l.inventory_item_id!] = (merged[l.inventory_item_id!] || 0) + l.qty;
   await q("UPDATE putaway_batches SET status='receiving', received_by=$2 WHERE id=$1", [id, by]);
   try {
-    const ref = await receiveIntoWarehouse(Object.entries(merged).map(([inventory_item_id, qty]) => ({ inventory_item_id, qty })), `${process.env.NEXT_PUBLIC_SITE_URL || "ops"}/putaway/${id}`);
+    const ref = await receiveIntoWarehouse(Object.entries(merged).map(([inventory_item_id, qty]) => ({ inventory_item_id, qty })), `${process.env.NEXT_PUBLIC_SITE_URL || "https://bs-warehouse.vercel.app"}/putaway/${id}?by=${encodeURIComponent(by)}`);
     await q("UPDATE putaway_batches SET status='received', received_at=now(), received_by=$2, shopify_ref=$3, error=NULL WHERE id=$1", [id, by, ref]);
     return { ok: true, ref, units: post.reduce((a, l) => a + l.qty, 0) };
   } catch (e) {

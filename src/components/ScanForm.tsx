@@ -45,10 +45,14 @@ export default function ScanForm() {
   const recent: Recent[] = order.map((c) => ({ code: c, label: items[c]?.label || "", qty: items[c]?.qty || 0 }));
   useEffect(() => { if (!cam) input.current?.focus(); }, [cam]);
 
+  const [who, setWho] = useState("");
+  useEffect(() => { try { setWho(localStorage.getItem("putaway-name") || ""); } catch {} }, []);
+  function setName(v: string) { setWho(v); try { localStorage.setItem("putaway-name", v); } catch {} }
   async function submit() {
+    if (!who.trim()) { setErr("Put your name in first – it goes on the batch and into Shopify's inventory history."); return; }
     setBusy(true); setErr(null);
     const text = order.map((c) => `${c},${items[c].qty}`).join("\n");
-    const fd = new FormData(); fd.set("text", text);
+    const fd = new FormData(); fd.set("text", text); fd.set("by", who.trim());
     const res = await fetch("/api/putaway/build", { method: "POST", body: fd }); const j = await res.json();
     setBusy(false);
     if (!res.ok) { setErr(j.error || "Failed"); return; }
@@ -58,6 +62,8 @@ export default function ScanForm() {
   return (
     <div className="card">
       {cam && <CameraScan continuous recent={recent} total={total} onScan={onScanned} onClose={() => setCam(false)} />}
+      <label>Your name <span className="meta">(saved on this phone · shows on the batch and in Shopify&apos;s inventory history)</span></label>
+      <input type="text" value={who} onChange={(e) => setName(e.target.value)} placeholder="e.g. Kirsten" autoComplete="given-name" style={{ marginBottom: 10, maxWidth: 260 }} />
       <div className="row">
         <button type="button" onClick={() => setCam(true)}>📷 Scan</button>
         <label className="btn secondary" style={{ cursor: "pointer" }}>Upload CSV<input type="file" accept=".csv,.txt,text/csv" onChange={onFile} style={{ display: "none" }} /></label>
