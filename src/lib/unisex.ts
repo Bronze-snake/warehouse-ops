@@ -8,9 +8,10 @@ import type { PickLine } from "./picklist";
 
 export const UNISEX_TARGET = 2;   // keep this many of each size on the Unisex listing
 export const MENS_FLOOR = 3;      // never take Mens below this; under this, leave it alone
+export const MAX_BACK = 5;        // Unisex → Mens: never move more than this per size (relabelling back and forth is a chore)
 
-export type UnisexLine = PickLine & { to_variant_id: string; to_inventory_item_id: string; to_sku: string; to_barcode: string; to_bin: string; to_product: string; from_inventory_item_id: string; direction: string; from_stock: number; to_stock: number };
-export type UnisexRun = { id: number; created_at: string; created_by: string; status: string; lines: number; units: number; pairs: number; adjusted_at: string | null; adjusted_by: string | null; shopify_ref: string | null; error: string | null; label: string; store: string; removed: number };
+export type UnisexLine = PickLine & { adjusted: number; to_variant_id: string; to_inventory_item_id: string; to_sku: string; to_barcode: string; to_bin: string; to_product: string; from_inventory_item_id: string; direction: string; from_stock: number; to_stock: number };
+export type UnisexRun = { id: number; created_at: string; created_by: string; status: string; lines: number; units: number; pairs: number; adjustments: number; adjusted_at: string | null; adjusted_by: string | null; shopify_ref: string | null; error: string | null; label: string; store: string; removed: number };
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS unisex_runs (
@@ -26,6 +27,8 @@ CREATE TABLE IF NOT EXISTS unisex_lines (
   pick integer NOT NULL, picked integer NOT NULL DEFAULT 0, picked_by text, picked_at timestamptz, method text
 );
 CREATE INDEX IF NOT EXISTS unisex_lines_run ON unisex_lines(run_id);
+ALTER TABLE unisex_lines ADD COLUMN IF NOT EXISTS adjusted integer NOT NULL DEFAULT 0;
+ALTER TABLE unisex_runs ADD COLUMN IF NOT EXISTS adjustments integer NOT NULL DEFAULT 0;
 `;
 let ready: Promise<void> | null = null;
 async function ensure() { if (!ready) ready = (async () => { for (const s of SCHEMA.split(";").map((x) => x.trim()).filter(Boolean)) await q(s); })(); await ready; }
@@ -70,7 +73,7 @@ export async function createUnisexRun(by: string): Promise<UnisexRun> {
   const skus = pairs.flatMap((p) => [...p.unisex.variants.nodes, ...p.mens.variants.nodes].map((v) => v.sku || "")).filter(Boolean);
   const binRows = skus.length ? await q<{ sku: string; bin: string }>("SELECT sku, bin FROM bins WHERE sku = ANY($1)", [skus]) : [];
   const bins: Record<string, string> = {}; for (const b of binRows) bins[b.sku] = b.bin;
-  const lines: Omit<UnisexLine, "id" | "run_id" | "picked" | "picked_by" | "picked_at" | "method">[] = []; const notes: Note[] = [];
+  const lines: Omit<UnisexLine, "id" | "run_id" | "picked" | "picked_by" | "picked_at" | "method" | "adjusted">[] = []; const notes: Note[] = [];
   for (const { unisex, mens } of pairs) {
     if (isFS(unisex) || isFS(mens)) { notes.push({ product: mens.title, size: "", reason: "FINAL SALE – left alone" }); continue; }
     const uBy: Record<string, V> = {}; for (const v of unisex.variants.nodes) uBy[sizeOf(v.title)] = v;
@@ -83,7 +86,7 @@ export async function createUnisexRun(by: string): Promise<UnisexRun> {
         const n = Math.min(UNISEX_TARGET - u, m - MENS_FLOOR);
         if (n > 0) lines.push({ ...base, dept: "Mens → Unisex", direction: "M>U", variant_id: mv.id, from_inventory_item_id: mv.inventoryItem.id, sku: mv.sku || "", barcode: mv.barcode || "", bin: bins[mv.sku || ""] || "", to_variant_id: uv.id, to_inventory_item_id: uv.inventoryItem.id, to_sku: uv.sku || "", to_barcode: uv.barcode || "", to_bin: bins[uv.sku || ""] || "", to_product: unisex.title, from_stock: m, to_stock: u, pick: n });
       } else if (m === 0 && u > UNISEX_TARGET) {
-        const n = u - UNISEX_TARGET;
+        const n = Math.min(MAX_BACK, u - UNISEX_TARGET);
         lines.push({ ...base, product: unisex.title, dept: "Unisex → Mens", direction: "U>M", variant_id: uv.id, from_inventory_item_id: uv.inventoryItem.id, sku: uv.sku || "", barcode: uv.barcode || "", bin: bins[uv.sku || ""] || "", to_variant_id: mv.id, to_inventory_item_id: mv.inventoryItem.id, to_sku: mv.sku || "", to_barcode: mv.barcode || "", to_bin: bins[mv.sku || ""] || "", to_product: mens.title.replace(/ - FINAL SALE$/i, ""), from_stock: u, to_stock: m, pick: n });
       } else if (u < UNISEX_TARGET && m <= MENS_FLOOR && m > 0) notes.push({ product: mens.title, size, reason: `Unisex ${u}, Mens only ${m} – under the floor of ${MENS_FLOOR}, left` });
     }
@@ -98,7 +101,7 @@ export async function createUnisexRun(by: string): Promise<UnisexRun> {
 
 function decorate(r: UnisexRun & { notes_json?: string }): UnisexRun {
   const { notes_json, ...rest } = r; void notes_json;
-  return { ...rest, store: "Unisex", label: `${r.pairs} pairs checked · ${r.lines} moves · ${r.units} units${r.status === "adjusted" ? ` · adjusted ${fmtTs(r.adjusted_at)} by ${r.adjusted_by}` : ""}`, removed: 0 };
+  return { ...rest, store: "Unisex", label: `${r.pairs} pairs checked · ${r.lines} moves · ${r.units} units${r.adjusted_at ? ` · last adjusted ${fmtTs(r.adjusted_at)} by ${r.adjusted_by}${r.adjustments > 1 ? ` (${r.adjustments}×)` : ""}` : ""}`, removed: 0 };
 }
 const fmtTs = (ts: string | null) => ts ? new Date(ts).toLocaleString("en-AU", { timeZone: "Australia/Melbourne", weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
 
@@ -107,7 +110,7 @@ export async function getUnisexRun(id: number) {
   const r = await q<UnisexRun & { notes_json: string }>("SELECT * FROM unisex_runs WHERE id=$1", [id]); if (!r[0]) return null;
   const raw = await q<UnisexLine>("SELECT * FROM unisex_lines WHERE run_id=$1", [id]);
   raw.sort((a, b) => (a.bin ? 0 : 1) - (b.bin ? 0 : 1) || binSort(a.bin, b.bin) || a.product.localeCompare(b.product) || sizeIdx(a.size) - sizeIdx(b.size));
-  const lines = raw.map((l) => ({ ...l, note: `→ ${l.to_bin || "no bin"} · relabel ${l.to_barcode || "?"}` }));
+  const lines = raw.map((l) => ({ ...l, note: `→ ${l.to_bin || "no bin"} · relabel ${l.to_barcode || "?"}${l.adjusted ? ` · ${l.adjusted} adjusted in Shopify` : ""}` }));
   let notes: Note[] = []; try { notes = JSON.parse(r[0].notes_json || "[]"); } catch {}
   const run = { ...decorate(r[0]), status: r[0].status === "adjusted" ? "finished" : r[0].status };
   return { run, lines, removed: notes.map((n) => ({ product: n.product, size: n.size, colour: "", sku: "", sold: 0, reason: n.reason })) };
@@ -124,7 +127,7 @@ export async function scanUnisex(runId: number, barcode: string, by: string, dep
   const code = barcode.trim();
   const run = (await q<UnisexRun>("SELECT * FROM unisex_runs WHERE id=$1", [runId]))[0];
   if (!run) return { ok: false as const, reason: "not_on_list", message: "Run not found" };
-  if (run.status !== "open") return { ok: false as const, reason: "finished", message: "This run has already been adjusted" };
+  if (run.status === "adjusted") return { ok: false as const, reason: "finished", message: "This run was closed – start a new RUN" };
   const cands = await q<UnisexLine>("SELECT * FROM unisex_lines WHERE run_id=$1 AND (barcode=$2 OR (sku<>'' AND sku=$2)) ORDER BY (picked < pick) DESC, id", [runId, code]);
   if (!cands.length) {
     const wrong = await q<UnisexLine>("SELECT * FROM unisex_lines WHERE run_id=$1 AND (to_barcode=$2 OR to_sku=$2) LIMIT 1", [runId, code]);
@@ -145,7 +148,7 @@ export async function overrideUnisex(runId: number, lineId: number, action: "pic
     ? await q<UnisexLine>("UPDATE unisex_lines SET picked=pick, picked_by=$3, picked_at=now(), method='manual' WHERE id=$1 AND run_id=$2 RETURNING *", [lineId, runId, by])
     : action === "skip"
     ? await q<UnisexLine>("UPDATE unisex_lines SET picked_by=$3, picked_at=now(), method='skipped' WHERE id=$1 AND run_id=$2 RETURNING *", [lineId, runId, by])
-    : await q<UnisexLine>("UPDATE unisex_lines SET picked=0, picked_by=NULL, picked_at=NULL, method=NULL WHERE id=$1 AND run_id=$2 RETURNING *", [lineId, runId]);
+    : await q<UnisexLine>("UPDATE unisex_lines SET picked=adjusted, picked_by=CASE WHEN adjusted>0 THEN picked_by ELSE NULL END, picked_at=CASE WHEN adjusted>0 THEN picked_at ELSE NULL END, method=CASE WHEN adjusted>0 THEN method ELSE NULL END WHERE id=$1 AND run_id=$2 RETURNING *", [lineId, runId]);
   return r[0] || null;
 }
 
@@ -154,16 +157,17 @@ export async function adjustUnisexRun(id: number, by: string): Promise<{ ok: boo
   await ensure();
   const got = await getUnisexRun(id); if (!got) return { ok: false, sent: 0, units: 0, message: "Not found" };
   const raw = await q<UnisexRun>("SELECT * FROM unisex_runs WHERE id=$1", [id]);
-  if (raw[0].status === "adjusted") return { ok: false, sent: 0, units: 0, message: `Already adjusted ${fmtTs(raw[0].adjusted_at)} by ${raw[0].adjusted_by}` };
-  const picked = got.lines.filter((l) => l.picked > 0 && l.method !== "skipped");
-  if (!picked.length) return { ok: false, sent: 0, units: 0, message: "Nothing picked – nothing to adjust" };
+  if (raw[0].status === "adjusting") return { ok: false, sent: 0, units: 0, message: "An adjustment is already running – wait a moment and refresh" };
+  // only what has been picked since the last adjustment
+  const picked = got.lines.map((l) => ({ ...l, picked: Math.min(l.picked, l.pick) - (l.adjusted || 0), full: l })).filter((l) => l.picked > 0 && l.method !== "skipped");
+  if (!picked.length) return { ok: false, sent: 0, units: 0, message: "Nothing new picked since the last adjustment" };
   // safety: every pair is equal and opposite, so the sum of all deltas is zero by construction
   const changes = picked.flatMap((l) => [
     { inventoryItemId: l.from_inventory_item_id, locationId: ONLINE_WAREHOUSE_ID, delta: -l.picked },
     { inventoryItemId: l.to_inventory_item_id, locationId: ONLINE_WAREHOUSE_ID, delta: l.picked },
   ]);
   if (changes.reduce((a, c) => a + c.delta, 0) !== 0) return { ok: false, sent: 0, units: 0, message: "Internal check failed (deltas don't net to zero) – nothing sent" };
-  await q("UPDATE unisex_runs SET status='adjusting', adjusted_by=$2 WHERE id=$1", [id, by]);
+  await q("UPDATE unisex_runs SET status='adjusting' WHERE id=$1", [id]);
   try {
     type R = { inventoryAdjustQuantities: { userErrors: { field: string[] | null; message: string }[]; inventoryAdjustmentGroup: { id: string } | null } };
     const d = await gql<R>(
@@ -172,7 +176,8 @@ export async function adjustUnisexRun(id: number, by: string): Promise<{ ok: boo
     );
     if (d.inventoryAdjustQuantities.userErrors?.length) throw new Error(d.inventoryAdjustQuantities.userErrors.map((e) => e.message).join("; "));
     const ref = d.inventoryAdjustQuantities.inventoryAdjustmentGroup?.id || "";
-    await q("UPDATE unisex_runs SET status='adjusted', adjusted_at=now(), adjusted_by=$2, shopify_ref=$3, error=NULL WHERE id=$1", [id, by, ref]);
+    for (const l of picked) await q("UPDATE unisex_lines SET adjusted=adjusted+$2 WHERE id=$1", [l.id, l.picked]);
+    await q("UPDATE unisex_runs SET status='open', adjusted_at=now(), adjusted_by=$2, shopify_ref=$3, error=NULL, adjustments=adjustments+1 WHERE id=$1", [id, by, ref]);
     return { ok: true, sent: picked.length, units: picked.reduce((a, l) => a + l.picked, 0) };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

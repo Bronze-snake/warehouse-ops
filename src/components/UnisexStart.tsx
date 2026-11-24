@@ -13,11 +13,11 @@ export default function UnisexStart() {
     try { const r = await fetch("/api/unisex/build", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ by: who.trim() }) }); const j = await r.json(); if (!r.ok) throw new Error(j.error || "Failed"); window.location.href = `/unisex/${j.id}`; }
     catch (e) { setErr(e instanceof Error ? e.message : String(e)); setBusy(false); }
   }
-  const open = runs.filter((r) => r.status === "open"), done = runs.filter((r) => r.status !== "open");
+  const open = runs.filter((r) => r.status !== "adjusted"), done = runs.filter((r) => r.status === "adjusted");
   return (
     <>
       <h1>👕 Unisex</h1>
-      <p className="sub">Balance the Unisex listings against their Mens twins at Preston. Rule: keep 2 of each size on Unisex from Mens, never take Mens below 3; send back to Mens only when Mens is at 0. FINAL SALE left alone.</p>
+      <p className="sub">Balance the Unisex listings against their Mens twins at Preston. Rule: keep 2 of each size on Unisex from Mens, never take Mens below 3; send back to Mens only when Mens is at 0, max 5 per size. FINAL SALE left alone.</p>
       <div className="card">
         <label>Your name</label>
         <input type="text" value={who} onChange={(e) => setWho(e.target.value)} placeholder="e.g. Kirsten" style={{ maxWidth: 260 }} />

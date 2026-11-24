@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import CameraScan, { beep, buzz, type Recent } from "./CameraScan";
 
-type Line = { id: number; sku: string; barcode: string; product: string; size: string; colour: string; dept: string; bin: string; sold: number; store_stock: number; wh_stock: number; pick: number; picked: number; picked_by: string | null; method: string | null; note?: string };
+type Line = { id: number; sku: string; barcode: string; product: string; size: string; colour: string; dept: string; bin: string; sold: number; store_stock: number; wh_stock: number; pick: number; picked: number; picked_by: string | null; method: string | null; note?: string; adjusted?: number };
 type Run = { id: number; store: string; label: string; status: string; created_at: string; created_by: string; finished_at: string | null; finished_by: string | null; lines: number; units: number; removed: number; orders?: { number: string; name: string; items: number; shipment_id?: string }[]; preview?: boolean; tag?: string | null };
 type Removed = { product: string; size: string; colour: string; sku: string; sold: number; reason: string };
 type Data = { run: Run; lines: Line[]; removed: Removed[] };
@@ -135,7 +135,7 @@ export default function PickView({ id, existing, cfg = STORE_CONFIG }: { id: num
 
       <div className="row noprint" style={{ marginBottom: 8, gap: 8 }}>
         <button type="button" className="secondary" onClick={() => setHideDone(!hideDone)}>{hideDone ? "Show picked" : "Hide picked"}</button>
-        {cfg.finishLabel && !finished && <button type="button" onClick={finish} disabled={busy || picked === 0}>{cfg.finishLabel}{picked ? ` (${picked})` : ""}</button>}
+        {cfg.finishLabel && !finished && (() => { const pend = inDept.reduce((a, l) => a + (l.method === "skipped" ? 0 : Math.max(0, Math.min(l.picked, l.pick) - (l.adjusted || 0))), 0); return <button type="button" onClick={finish} disabled={busy || pend === 0}>{cfg.finishLabel}{pend ? ` (${pend})` : ""}</button>; })()}
         <details style={{ marginLeft: "auto" }}><summary className="meta" style={{ cursor: "pointer", padding: "8px 4px" }}>More</summary>
           <div className="row" style={{ marginTop: 8, justifyContent: "flex-end" }}>
             <button type="button" className="secondary" onClick={() => window.print()}>Print</button>
@@ -153,7 +153,7 @@ export default function PickView({ id, existing, cfg = STORE_CONFIG }: { id: num
           return (
             <li key={l.id} className={(done ? "done " : "") + (l.bin ? "" : "noloc ") + (open ? "open" : "")} onClick={() => setOpenLine(open ? null : l.id)}>
               <div className="pbin">{l.bin || "no bin"}</div>
-              <div className="pbody"><div className="pname">{l.product}</div><div className="psize">{[l.size, l.colour && !l.product.toLowerCase().includes(l.colour.toLowerCase()) ? l.colour : ""].filter(Boolean).join(" · ")}{!dept && <span className="deptpill">{l.dept}</span>}{l.method === "manual" && <span className="deptpill manual">manual</span>}{skipped && <span className="deptpill skipped">skipped</span>}</div>{l.note && <div className="pnote">{l.note}</div>}
+              <div className="pbody"><div className="pname">{l.product}</div><div className="psize">{[l.size, l.colour && !l.product.toLowerCase().includes(l.colour.toLowerCase()) ? l.colour : ""].filter(Boolean).join(" · ")}{!dept && <span className="deptpill">{l.dept}</span>}{l.method === "manual" && <span className="deptpill manual">manual</span>}{skipped && <span className="deptpill skipped">skipped</span>}{!!l.adjusted && <span className="deptpill adjusted">in Shopify</span>}</div>{l.note && <div className="pnote">{l.note}</div>}
                 {open && <div className="pactions" onClick={(e) => e.stopPropagation()}>
                   <div className="meta">Sold {l.sold} · store has {l.store_stock} · warehouse {l.wh_stock}{l.sku ? ` · ${l.sku}` : ""}{l.picked_by ? ` · picked by ${l.picked_by}` : ""}</div>
                   {!finished && <div className="row" style={{ marginTop: 6 }}>
@@ -164,7 +164,7 @@ export default function PickView({ id, existing, cfg = STORE_CONFIG }: { id: num
                 </div>}
               </div>
               <div className="pqty">{l.pick > 1 || l.picked > 0 ? <><span className={l.picked ? "got" : ""}>{Math.min(l.picked, l.pick)}</span><small>/{l.pick}</small></> : l.pick}</div>
-              <div className="ptick">{skipped ? "–" : done ? "✓" : ""}</div>
+              <div className="ptick" role="button" onClick={(e) => { e.stopPropagation(); if (finished) return; if (!done) override(l, "pick"); else if (!l.adjusted || l.picked > l.adjusted) override(l, "undo"); }}>{skipped ? "–" : done ? "✓" : ""}</div>
             </li>);
         })}
       </ul>
